@@ -6,10 +6,6 @@ import (
 	"os"
 )
 
-const sectionDefault  = "default"
-const sectionDatabase = "database"
-
-
 func setDaemonLogLevel(logLevel string) {
 	if logLevel != "" {
 		lvl, err := logrus.ParseLevel(logLevel)

@@ -6,15 +6,22 @@ import (
 )
 
 type containerRouter struct {
-	routes  []router.Route
 	backend interface{}
+	routes  []router.Route
 }
 
 
 func NewRouter(b interface{}) router.Router {
-	r := &containerRouter{backend: b}
+	r := &containerRouter{
+		backend: b,
+	}
 	r.initRoutes()
 	return r
+}
+
+// Routes returns the available routers to the container controller
+func (r *containerRouter) Routes() []router.Route {
+	return r.routes
 }
 
 // initRoutes initializes the routes in container router

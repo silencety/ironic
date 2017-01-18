@@ -1,8 +1,11 @@
 package config
 
+import "src/github.com/ini"
+
 type Daemon struct {
 	dbTransport *DBTransport
 	mQ *MQ
+	PidFile string
 }
 
 
@@ -16,18 +19,27 @@ type MQ struct {
 }
 
 
-func (d *Daemon) initDB(){
+func (d *Daemon) initDB(GlobalConfig *ini.File){
 
 }
 
-func (d *Daemon) initMQ(){
+
+func (d *Daemon) initMQ(GlobalConfig *ini.File){
 
 }
 
-func InitDaemon() *Daemon{
+func InitDaemon(GlobalConfig *ini.File) *Daemon{
 
 	d := new(Daemon)
-	d.initDB()
-	d.initMQ()
+	d.initDB(GlobalConfig)
+	d.initMQ(GlobalConfig)
+	pidFile := GlobalConfig.Section(SectionDefault).Key("pidFile").String()
+	if pidFile == "" {
+		pidFile = defaultPidFile
+	}
+	d.PidFile = pidFile
 	return d
+}
+
+func (d *Daemon) Shutdown(){
 }

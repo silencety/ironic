@@ -15,3 +15,7 @@ type Addr struct {
 	Proto string
 	Addr  string
 }
+
+const SectionDefault  = "default"
+const SectionDatabase = "database"
+const defaultPidFile = "/var/run/ironic.pid"

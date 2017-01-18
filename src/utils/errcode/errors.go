@@ -265,3 +265,22 @@ func (errs *Errors) UnmarshalJSON(data []byte) error {
 	*errs = newErrs
 	return nil
 }
+
+// GetErrorMessage returns the human readable message associated with
+// the passed-in error. In some cases the default Error() func returns
+// something that is less than useful so based on its types this func
+// will go and get a better piece of text.
+func GetErrorMessage(err error) string {
+	switch err.(type) {
+	case Error:
+		e, _ := err.(Error)
+		return e.Message
+
+	case ErrorCode:
+		ec, _ := err.(ErrorCode)
+		return ec.Message()
+
+	default:
+		return err.Error()
+	}
+}

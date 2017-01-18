@@ -27,23 +27,23 @@ var (
 func ConfigInit(file string) (cfg *ini.File){
 
 
-	GlobalConfig = &Global{Platform:"linux",Name:"global"}
+	GlobalConfig = &Global{Platform:"linux", Name:"global"}
 	cfg, err := ini.Load(file)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-
-	bind_addr := cfg.Section("default").Key("bind").String()
-	fmt.Println(bind_addr)
-	DataBaseConfig = new(Database)
-	fmt.Println(cfg.Section("database").Key("connection").String())
-	err = cfg.Section("database").MapTo(DataBaseConfig)
-	if err == nil {
-		fmt.Println(DataBaseConfig.Connection)
-	}else {
-		fmt.Println(err)
-	}
+	//
+	//bind_addr := cfg.Section("default").Key("bind").String()
+	//fmt.Println(bind_addr)
+	//DataBaseConfig = new(Database)
+	//fmt.Println(cfg.Section("database").Key("connection").String())
+	//err = cfg.Section("database").MapTo(DataBaseConfig)
+	//if err == nil {
+	//	fmt.Println(DataBaseConfig.Connection)
+	//}else {
+	//	fmt.Println(err)
+	//}
         return  cfg
 
 }

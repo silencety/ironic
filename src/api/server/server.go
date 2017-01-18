@@ -12,6 +12,11 @@ import (
 	"strconv"
 	"api/server/router/host"
 	"config"
+	"strings"
+	"src/github.com/gorilla/mux"
+	"api/server/httputils"
+	"src/golang.org/x/net/context"
+	"utils/errcode"
 )
 
 type Config struct {
@@ -36,7 +41,7 @@ type Server struct {
 	routers       []router.Router
 	//authZPlugins  []authorization.Plugin
 	routerSwapper *routerSwapper
-	//daemon        *daemon.Daemon
+	daemon        *config.Daemon
 }
 
 type HTTPServer struct {
@@ -130,6 +135,7 @@ func allocateDaemonPort(addr string) error {
 // InitRouters initializes a list of routers for the server.
 func (s *Server) InitRouters(d *config.Daemon) {
 	s.addRouter(host.NewRouter(d))
+	//s.addRouter(xxx.NewRouter(d))
 }
 
 // addRouter adds a new router to the server.
@@ -137,6 +143,120 @@ func (s *Server) addRouter(r router.Router) {
 	s.routers = append(s.routers, r)
 }
 
+// SetDaemon initializes the daemon field
+func (s *Server) SetDaemon(daemon *config.Daemon) {
+	s.daemon = daemon
+}
+
+// Wait blocks the server goroutine until it exits.
+// It sends an error message if there is any error during
+// the API execution.
+func (s *Server) Wait(waitChan chan error) {
+	if err := s.serveAPI(); err != nil {
+		logrus.Errorf("ServeAPI error: %v", err)
+		waitChan <- err
+		return
+	}
+	waitChan <- nil
+}
+
+func (s *Server) initRouterSwapper() {
+	s.routerSwapper = &routerSwapper{
+		router: s.createMux(),
+	}
+}
+
+// createMux initializes the main router the server uses.
+// we keep enableCors just for legacy usage, need to be removed in the future
+func (s *Server) createMux() *mux.Router {
+	m := mux.NewRouter()
+	logrus.Debugf("Registering routers")
+	for _, apiRouter := range s.routers {
+		for _, r := range apiRouter.Routes() {
+			f := s.makeHTTPHandler(r.Handler())
+
+			logrus.Debugf("Registering %s, %s", r.Method(), r.Path())
+			//m.Path(versionMatcher + r.Path()).Methods(r.Method()).Handler(f)
+			m.Path(r.Path()).Methods(r.Method()).Handler(f)
+		}
+	}
+
+	return m
+}
+
+func (s *Server) makeHTTPHandler(handler httputils.APIFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// log the handler call
+		logrus.Debugf("Calling %s %s", r.Method, r.URL.Path)
+
+		// Define the context that we'll pass around to share info
+		// like the docker-request-id.
+		//
+		// The 'context' will be used for global data that should
+		// apply to all requests. Data that is specific to the
+		// immediate function being called should still be passed
+		// as 'args' on the function call.
+		ctx := context.Background()
+		//handlerFunc := s.handleWithGlobalMiddlewares(handler)
+		handlerFunc := handler
+		vars := mux.Vars(r)
+		if vars == nil {
+			vars = make(map[string]string)
+		}
+
+		if err := handlerFunc(ctx, w, r, vars); err != nil {
+			logrus.Errorf("Handler for %s %s returned error: %s", r.Method, r.URL.Path, errcode.GetErrorMessage(err))
+			httputils.WriteError(w, err)
+		}
+	}
+}
+
+// serveAPI loops through all initialized servers and spawns goroutine
+// with Server method for each. It sets createMux() as Handler also.
+func (s *Server) serveAPI() error {
+	s.initRouterSwapper()
+
+	var chErrors = make(chan error, len(s.servers))
+	for _, srv := range s.servers {
+		srv.srv.Handler = s.routerSwapper
+		go func(srv *HTTPServer) {
+			var err error
+			logrus.Infof("API listen on %s", srv.l.Addr())
+			if err = srv.Serve(); err != nil && strings.Contains(err.Error(), "use of closed network connection") {
+				err = nil
+			}
+			chErrors <- err
+		}(srv)
+	}
+
+	for i := 0; i < len(s.servers); i++ {
+		err := <-chErrors
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Serve starts listening for inbound requests.
+func (s *HTTPServer) Serve() error {
+	return s.srv.Serve(s.l)
+}
+
+// Close closes servers and thus stop receiving requests
+func (s *Server) Close() {
+	for _, srv := range s.servers {
+		if err := srv.Close(); err != nil {
+			logrus.Error(err)
+		}
+	}
+}
+
+// Close closes the HTTPServer from listening for the inbound requests.
+func (s *HTTPServer) Close() error {
+	return s.l.Close()
+}
 
 
 
